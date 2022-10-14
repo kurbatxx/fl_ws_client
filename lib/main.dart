@@ -1,7 +1,20 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:websok_ex/enum/action.dart';
+import 'package:websok_ex/model/action.dart';
+import 'package:websok_ex/model/message.dart';
 
 void main() {
+  final jsonData = jsonDecode(
+      '{"action":"get_messages","data":[{"id":0,"message":"hello"}]}');
+  final receivedAction = ReceivedAction.fromJson(jsonData);
+  if (receivedAction.action == ActionEnum.getMessages.value) {
+    final data = receivedAction.data as List;
+    final _ = data.map((item) => Message.fromJson(item)).toList();
+  }
+
   runApp(
     MaterialApp(
       theme: ThemeData(
@@ -26,13 +39,14 @@ class _HomePageState extends State<HomePage> {
     Uri.parse('ws://192.168.1.127:5009/ws'),
   );
 
-  final _controller = TextEditingController();
+  late TextEditingController _controller;
   late Stream _broadcast;
-  late List<String> messages;
+  late List<Message> messages;
 
   @override
   void initState() {
     _broadcast = _channel.stream.asBroadcastStream();
+    _controller = TextEditingController();
     messages = [];
     super.initState();
   }
@@ -55,34 +69,65 @@ class _HomePageState extends State<HomePage> {
             },
           ),
           const SizedBox(height: 24),
-          StreamBuilder(
-            stream: _broadcast,
-            builder: (context, AsyncSnapshot snapshot) {
-              if (snapshot.hasError) {
-                return const Text('Нет подключения к серверу');
-              } else if (snapshot.hasData) {
-                messages.add(snapshot.data as String);
-                return Expanded(
-                  child: ListView.builder(
+          Expanded(
+            child: StreamBuilder(
+              stream: _broadcast,
+              builder: (context, AsyncSnapshot snapshot) {
+                if (snapshot.hasError) {
+                  return const Text('Нет подключения к серверу');
+                } else if (snapshot.hasData) {
+                  final jsonData = jsonDecode(snapshot.data as String);
+                  final receivedAction = ReceivedAction.fromJson(jsonData);
+                  final action = toEnum(receivedAction.action);
+                  if (action != null) {
+                    switch (action) {
+                      case ActionEnum.getMessages:
+                        messages.clear();
+
+                        final data = receivedAction.data as List;
+                        final dbMessages =
+                            data.map((item) => Message.fromJson(item)).toList();
+                        messages.addAll(dbMessages);
+                        break;
+                      case ActionEnum.addMessage:
+                        final data =
+                            receivedAction.data as Map<String, dynamic>;
+                        final dbMessage = Message.fromJson(data);
+                        messages.add(dbMessage);
+                        break;
+                    }
+                  }
+                  if (receivedAction.action == ActionEnum.getMessages.value) {}
+
+                  //messages.add(snapshot.data as String);
+                  return ListView.builder(
                     shrinkWrap: true,
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
-                      final text = messages[index];
+                      final message = messages[index];
                       return ListTile(
-                        title: Text(text),
+                        title: Text(message.message),
                       );
                     },
-                  ),
-                );
-              }
-              return Text(snapshot.hasData ? '${snapshot.data}' : '');
-            },
+                  );
+                }
+                return Text(snapshot.hasData ? '${snapshot.data}' : '');
+              },
+            ),
           ),
         ],
       ),
       floatingActionButton: TextButton(
         onPressed: () {
-          _channel.sink.add(_controller.text);
+          final sendMessage = ReceivedAction(
+            action: ActionEnum.addMessage.value,
+            data: _controller.text,
+          );
+
+          String json = jsonEncode(sendMessage);
+          print(json);
+
+          _channel.sink.add(json);
         },
         child: const Text('Отправить'),
       ),
