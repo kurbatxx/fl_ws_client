@@ -7,20 +7,11 @@ import 'package:websok_ex/model/action.dart';
 import 'package:websok_ex/model/message.dart';
 
 void main() {
-  final jsonData = jsonDecode(
-      '{"action":"get_messages","data":[{"id":0,"message":"hello"}]}');
-  final receivedAction = ReceivedAction.fromJson(jsonData);
-  if (receivedAction.action == ActionEnum.getMessages.value) {
-    final data = receivedAction.data as List;
-    final _ = data.map((item) => Message.fromJson(item)).toList();
-  }
-
   runApp(
     MaterialApp(
       theme: ThemeData(
         primarySwatch: Colors.blue,
       ),
-      title: 'Material App',
       debugShowCheckedModeBanner: false,
       home: const HomePage(),
     ),
@@ -55,18 +46,32 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('WEB_Soket'),
+        title: const Text('WEB_Socket'),
       ),
       body: Column(
         children: [
-          TextField(
-            controller: _controller,
-          ),
-          StreamBuilder(
-            stream: _broadcast,
-            builder: (context, snapshot) {
-              return Text(snapshot.hasData ? '${snapshot.data}' : '');
-            },
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _controller,
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  final sendMessage = ReceivedAction(
+                    action: ActionEnum.addMessage.value,
+                    data: _controller.text,
+                  );
+
+                  String json = jsonEncode(sendMessage);
+                  //print(json);
+
+                  _channel.sink.add(json);
+                },
+                child: const Text('Отправить'),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           Expanded(
@@ -78,7 +83,7 @@ class _HomePageState extends State<HomePage> {
                 } else if (snapshot.hasData) {
                   final jsonData = jsonDecode(snapshot.data as String);
                   final receivedAction = ReceivedAction.fromJson(jsonData);
-                  final action = toEnum(receivedAction.action);
+                  final action = actionToEnum(receivedAction.action);
                   if (action != null) {
                     switch (action) {
                       case ActionEnum.getMessages:
@@ -95,6 +100,12 @@ class _HomePageState extends State<HomePage> {
                         final dbMessage = Message.fromJson(data);
                         messages.add(dbMessage);
                         break;
+                      case ActionEnum.deleteMessage:
+                        final data =
+                            receivedAction.data as Map<String, dynamic>;
+                        final dbMessage = Message.fromJson(data);
+                        messages.removeWhere((item) => item.id == dbMessage.id);
+                        break;
                     }
                   }
                   if (receivedAction.action == ActionEnum.getMessages.value) {}
@@ -107,29 +118,33 @@ class _HomePageState extends State<HomePage> {
                       final message = messages[index];
                       return ListTile(
                         title: Text(message.message),
+                        leading: TextButton(
+                          onPressed: () {},
+                          child: const Text('Готово'),
+                        ),
+                        trailing: TextButton(
+                          onPressed: () {
+                            final sendMessage = ReceivedAction(
+                              action: ActionEnum.deleteMessage.value,
+                              data: message,
+                            );
+
+                            String json = jsonEncode(sendMessage);
+                            print(json);
+
+                            _channel.sink.add(json);
+                          },
+                          child: const Text('Удалить'),
+                        ),
                       );
                     },
                   );
                 }
-                return Text(snapshot.hasData ? '${snapshot.data}' : '');
+                return const Text('Ошибка');
               },
             ),
           ),
         ],
-      ),
-      floatingActionButton: TextButton(
-        onPressed: () {
-          final sendMessage = ReceivedAction(
-            action: ActionEnum.addMessage.value,
-            data: _controller.text,
-          );
-
-          String json = jsonEncode(sendMessage);
-          print(json);
-
-          _channel.sink.add(json);
-        },
-        child: const Text('Отправить'),
       ),
     );
   }

@@ -13,4 +13,9 @@ class Message {
       message: json['message'],
     );
   }
+
+  Map toJson() => {
+        'id': id,
+        'message': message,
+      };
 }
