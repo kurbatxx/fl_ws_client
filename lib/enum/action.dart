@@ -1,7 +1,8 @@
 enum ActionEnum {
   getMessages('get_messages'),
   addMessage('add_message'),
-  deleteMessage('delete_message');
+  deleteMessage('delete_message'),
+  updateStatus('update_status');
 
   final String value;
   const ActionEnum(this.value);

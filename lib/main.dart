@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:websok_ex/enum/action.dart';
+import 'package:websok_ex/enum/status.dart';
 import 'package:websok_ex/model/action.dart';
 import 'package:websok_ex/model/message.dart';
 
@@ -88,7 +89,6 @@ class _HomePageState extends State<HomePage> {
                     switch (action) {
                       case ActionEnum.getMessages:
                         messages.clear();
-
                         final data = receivedAction.data as List;
                         final dbMessages =
                             data.map((item) => Message.fromJson(item)).toList();
@@ -106,21 +106,66 @@ class _HomePageState extends State<HomePage> {
                         final dbMessage = Message.fromJson(data);
                         messages.removeWhere((item) => item.id == dbMessage.id);
                         break;
+                      case ActionEnum.updateStatus:
+                        final data =
+                            receivedAction.data as Map<String, dynamic>;
+                        final dbMessage = Message.fromJson(data);
+
+                        messages[messages.indexWhere(
+                            (item) => item.id == dbMessage.id)] = dbMessage;
+                        break;
                     }
                   }
-                  if (receivedAction.action == ActionEnum.getMessages.value) {}
 
-                  //messages.add(snapshot.data as String);
                   return ListView.builder(
                     shrinkWrap: true,
                     itemCount: messages.length,
                     itemBuilder: (context, index) {
                       final message = messages[index];
+
+                      Color color = Colors.white;
+                      final status = statusToEnum(message.status);
+                      if (status != null) {
+                        switch (status) {
+                          case StatusEnum.wait:
+                            color = Colors.red;
+                            break;
+                          case StatusEnum.transferred:
+                            color = Colors.yellow;
+                            break;
+                          case StatusEnum.complete:
+                            color = Colors.green;
+                            break;
+                        }
+                      }
+
                       return ListTile(
                         title: Text(message.message),
-                        leading: TextButton(
-                          onPressed: () {},
-                          child: const Text('Готово'),
+                        leading: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            TextButton(
+                              onPressed: () {
+                                final updateMessage = Message(
+                                    id: message.id,
+                                    message: message.message,
+                                    status: StatusEnum.complete.value);
+                                final sendMessage = ReceivedAction(
+                                  action: ActionEnum.updateStatus.value,
+                                  data: updateMessage,
+                                );
+
+                                String json = jsonEncode(sendMessage);
+                                print(json);
+
+                                _channel.sink.add(json);
+                              },
+                              child: const Text('Готово'),
+                            ),
+                            CircleAvatar(
+                              backgroundColor: color,
+                            )
+                          ],
                         ),
                         trailing: TextButton(
                           onPressed: () {

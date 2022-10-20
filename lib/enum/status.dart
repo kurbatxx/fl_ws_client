@@ -1,7 +1,7 @@
 enum StatusEnum {
   wait('wait'),
-  transferred('transferred'),
-  complete('complete');
+  complete('complete'),
+  transferred('transferred');
 
   final String value;
   const StatusEnum(this.value);
